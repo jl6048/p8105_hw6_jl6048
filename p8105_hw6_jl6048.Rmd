@@ -8,6 +8,7 @@ output: github_document
 ```{r message=FALSE}
 library(tidyverse)
 library(readxl)
+library(modelr)
 
 knitr::opts_chunk$set(
   echo = TRUE,
@@ -19,4 +20,116 @@ knitr::opts_chunk$set(
 
 
 ## Problem 1
+
+Load and clean the dataset for regression analysis:
+
+```{r}
+child_df = 
+  readr::read_csv("data/birthweight.csv") %>%
+  janitor::clean_names() %>%
+  mutate(
+    babysex = as.factor(babysex),
+    frace = as.factor(frace),
+    mrace = as.factor(mrace),
+    malform = as.factor(malform)
+  )
+
+# check for missing value - no missing
+sum(complete.cases(child_df))
+sum(!complete.cases(child_df))
+```
+
+
+Propose a regression model for birthweight:
+```{r}
+model_1 = lm(bwt ~ gaweeks, data = child_df)
+summary(model_1)
+```
+
+
+ A plot of model residuals against fitted values:
+```{r}
+child_df %>% 
+  modelr::add_residuals(model_1) %>% 
+  modelr::add_predictions(model_1) %>% 
+  ggplot(aes(x = pred, y = resid, color = resid)) + 
+  geom_point(alpha = 0.5)+ 
+  stat_smooth(method = "lm") +
+  labs(title = "Predicted vs residuals", 
+       x = "Predicted", 
+       y = "Residuals")
+```
+
+**Describe:**
+model_1 is a simple linear regression with gestational age as the predictor (X) and birth weight as Y. It can be seen from the plot that the residuals are relatively evenly distributed around y = 0 and below. Therefore, it satisfies the linearity assumption.
+
+
+Compare your model to two others:
+
+```{r}
+# One using length at birth and gestational age as predictors (main effects only)
+model_2 = lm(bwt ~ blength + gaweeks, data = child_df) %>%
+  broom::glance()
+
+
+#One using head circumference, length, sex, and all interactions (including the three-way interaction) between these
+model_3 = lm(bwt ~bhead + blength + babysex + bhead*blength + bhead*babysex + blength*babysex + bhead*blength*babysex , data = child_df) %>%
+  broom::glance()
+```
+
+Make this comparison in terms of the cross-validated prediction error:
+
+```{r}
+cv_data =
+  crossv_mc(child_df, 100) %>% 
+  mutate(
+    train = map(train, as_tibble),
+    test = map(test, as_tibble))
+cv_data 
+```
+
+
+```{r}
+cv_data = 
+  cv_data %>% 
+  mutate(
+    model_1  = map(train, ~lm(bwt ~ gaweeks, data = .x)),
+    model_2  = map(train, ~lm(bwt ~ blength + gaweeks, data = .x)),
+    model_3  = map(train, ~lm(bwt ~ 
+       bhead + blength + babysex + 
+       bhead * blength + 
+       bhead * babysex + 
+       blength * babysex + 
+       bhead * blength * babysex, data = .x))) %>% 
+  mutate(
+    rmse_model_1 = 
+      map2_dbl(model_1, test, ~rmse(model = .x, data = .y)),
+    rmse_model_2 = 
+      map2_dbl(model_2, test, ~rmse(model = .x, data = .y)),
+    rmse_model_3 =
+      map2_dbl(model_3, test, ~rmse(model = .x, data = .y)))
+cv_data
+```
+
+
+```{r}
+cv_data %>% 
+  select(starts_with("rmse")) %>% 
+  pivot_longer(
+    everything(),
+    names_to = "model", 
+    values_to = "rmse",
+    names_prefix = "rmse_") %>% 
+  mutate(model = fct_inorder(model)) %>% 
+  ggplot(aes(x = model, y = rmse)) + 
+  geom_violin() +
+   labs(
+        title = "Comparing birthweight models",
+        x = "Model",
+        y = "Rmse"
+      )
+```
+
+**Comment:**
+From this violin plot, it can be seen that the Rmse of the first model is the highest, and the Rmse of the third model is the lowest. The third model with interaction terms is the best model because it has the lowest mean square value.
 
