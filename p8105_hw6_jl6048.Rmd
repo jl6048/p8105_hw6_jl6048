@@ -19,7 +19,7 @@ knitr::opts_chunk$set(
 ```
 
 
-## Problem 1
+### Problem 1
 
 Load and clean the dataset for regression analysis:
 
@@ -132,4 +132,98 @@ cv_data %>%
 
 **Comment:**
 From this violin plot, it can be seen that the Rmse of the first model is the highest, and the Rmse of the third model is the lowest. The third model with interaction terms is the best model because it has the lowest mean square value.
+
+
+### Problem 2:
+Load data
+```{r}
+weather_df = 
+  rnoaa::meteo_pull_monitors(
+    c("USW00094728"),
+    var = c("PRCP", "TMIN", "TMAX"), 
+    date_min = "2017-01-01",
+    date_max = "2017-12-31") %>%
+  mutate(
+    name = recode(id, USW00094728 = "CentralPark_NY"),
+    tmin = tmin / 10,
+    tmax = tmax / 10) %>%
+  select(name, id, everything())
+weather_df 
+```
+
+ For R squared: 
+```{r}
+bootstrap_r =
+  weather_df %>% 
+  modelr::bootstrap(n = 5000) %>% 
+  mutate(
+    models = map(strap, ~lm( tmax ~ tmin , data = .x) ),
+    results = map(models, broom::glance)) %>% 
+  select(.id, results) %>% 
+  unnest(results)
+bootstrap_r
+
+bootstrap_r %>% 
+ggplot(aes(x = r.squared)) + 
+  geom_density() +
+   labs(
+      x = "R squared values",
+      y = "Density",
+      title = "Distribution of R Squared Estimates")
+
+```
+
+For log of betas:
+```{r}
+bootstrap_log =
+  weather_df %>% 
+   modelr::bootstrap(n = 5000)%>% 
+  mutate(
+    models = map(strap, ~lm( tmax ~ tmin , data = .x) ),
+    results = map(models, broom::tidy)) %>% 
+  select(.id, results) %>% 
+  unnest(results)%>% 
+  select(.id, term, estimate) %>% 
+  pivot_wider(
+    names_from = term,
+    values_from = estimate
+  ) %>% 
+  janitor::clean_names() %>% 
+  mutate(
+    beta_log = log(intercept * tmin)
+  ) 
+bootstrap_log
+
+bootstrap_log %>% 
+ggplot(aes(x = beta_log)) + 
+  geom_density() +
+   labs(
+      x = "Log coefficients values",
+      y = "Density",
+      title = "Distribution of log coefficients Estimates")
+
+```
+**Comment:**
+From the distribution plot, we can easily find that the distribution of R Squared looks like a normal distribution but slightly left skewed. The log plot looks like more skewed to the normal distribution than R.
+
+
+
+Confidence Interval :
+
+```{r}
+bootstrap_r %>% 
+  summarize(
+    CI_lower_r = quantile(r.squared, 0.025),
+    CI_upper_r = quantile(r.squared, 0.975)
+  ) %>% 
+  knitr::kable(digits = 3)
+
+bootstrap_log %>% 
+  summarize(
+    CI_lower_log = quantile(beta_log, 0.025),
+    CI_upper_log = quantile(beta_log, 0.975)
+  ) %>% 
+  knitr::kable(digits = 3)
+
+```
 
