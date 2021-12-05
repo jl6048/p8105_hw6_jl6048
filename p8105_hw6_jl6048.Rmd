@@ -206,7 +206,8 @@ ggplot(aes(x = beta_log)) +
 
 ```
 **Comment:**
-From the distribution plot, we can easily find that the distribution of R Squared looks like a normal distribution but slightly left skewed. The log plot looks like more skewed to the normal distribution than R.
+From the distribution plot, we can easily find that the distribution of R Squared looks like a normal distribution but slightly left skewed. The log plot looks like more skewed to the normal distribution than R. R squared  with a mean of `r round(mean(pull(bootstrap_r, r.squared)), 3)` and standard deviation of `r round(sd(pull(bootstrap_r, r.squared)), 3)`. 
+Log estimates with a mean of `r round(mean(pull(bootstrap_log, beta_log)), 3)` and standard deviation of `r round(sd(pull(bootstrap_log, beta_log)), 3)`.
 
 
 
