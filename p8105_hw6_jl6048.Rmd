@@ -31,8 +31,10 @@ child_df =
     babysex = as.factor(babysex),
     frace = as.factor(frace),
     mrace = as.factor(mrace),
-    malform = as.factor(malform)
-  )
+    malform = as.factor(malform),
+    babysex = fct_recode(babysex, "male" = "1", "female" = "2"),
+    frace = fct_recode(frace, "white" = "1", "black" = "2", "asian" = "3", "puerto rican" = "4", "other" = "8", "unknown" = "9"),
+    mrace = fct_recode(mrace, "white" = "1", "black" = "2", "asian" = "3","puerto rican" = "4", "other" = "8", "unknown" = "9"))
 
 # check for missing value - no missing
 sum(complete.cases(child_df))
@@ -68,13 +70,15 @@ Compare your model to two others:
 
 ```{r}
 # One using length at birth and gestational age as predictors (main effects only)
-model_2 = lm(bwt ~ blength + gaweeks, data = child_df) %>%
-  broom::glance()
+model_2 = lm(bwt ~ blength + gaweeks, data = child_df)
+summary(model_2) %>% 
+  broom::tidy()
 
 
 #One using head circumference, length, sex, and all interactions (including the three-way interaction) between these
-model_3 = lm(bwt ~bhead + blength + babysex + bhead*blength + bhead*babysex + blength*babysex + bhead*blength*babysex , data = child_df) %>%
-  broom::glance()
+model_3 = lm(bwt ~bhead + blength + babysex + bhead*blength + bhead*babysex + blength*babysex + bhead*blength*babysex , data = child_df) 
+summary(model_3) %>% 
+  broom::tidy()
 ```
 
 Make this comparison in terms of the cross-validated prediction error:
@@ -85,7 +89,6 @@ cv_data =
   mutate(
     train = map(train, as_tibble),
     test = map(test, as_tibble))
-cv_data 
 ```
 
 
@@ -108,7 +111,6 @@ cv_data =
       map2_dbl(model_2, test, ~rmse(model = .x, data = .y)),
     rmse_model_3 =
       map2_dbl(model_3, test, ~rmse(model = .x, data = .y)))
-cv_data
 ```
 
 
